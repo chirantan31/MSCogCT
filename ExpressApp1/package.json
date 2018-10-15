@@ -1,0 +1,29 @@
+{
+  "name": "express-app1",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node app"
+  },
+  "description": "ExpressApp1",
+  "author": {
+    "name": ""
+  },
+  "dependencies": {
+    "body-parser": "^1.15.0",
+    "cookie-parser": "^1.4.0",
+    "debug": "^2.6.9",
+    "express": "^4.14.0",
+    "morgan": "^1.7.0",
+    "node-wget": "^0.4.3",
+    "pug": "^2.0.3",
+    "request": "^2.88.0",
+    "request-cookies": "^1.1.0",
+    "sequelize": "^4.39.0",
+    "serve-favicon": "^2.3.0",
+    "sqlite3": "^4.0.2",
+    "unirest": "^0.5.1",
+    "youtube-dl": "^1.12.2",
+    "ytdl-getinfo": "^1.1.0"
+  }
+}

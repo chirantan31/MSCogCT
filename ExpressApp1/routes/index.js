@@ -5,13 +5,18 @@ var db = require('../db/db');
 const request = require('request');
 var Cookie = require('request-cookies').Cookie;
 
+var fs = require('fs');
+var youtubedl = require('youtube-dl');
+var youtube_google_api_key = 'AIzaSyDKnpdznYOFxm_IRnrclGh4oSdQloZycOo';
+
 /* GET home page. */
 router.get('/', function (req, res) {
     var email = 'hongyuw2@illinois.edu';
     var password = 'JmjlfZYERRIvbYjb';
-
     echo_scraper(email, password);
 
+    var channel_id = 'UCeqlHZDmUEQQHYqnei8doYg';
+    youtube_scraper_channel(channel_id);
 
     res.render('index', { title: 'Express' });
 });
@@ -21,16 +26,85 @@ router.get('/downloadLecture', function (req, res) {
     res.render('index', { title: 'Express' });
 });
 
-function youtuber() {
-    var playList = 'PLBAGcD3siRDguyYYzhVwZ3tLvOyyG5k6K';
-    const { getInfo } = require('ytdl-getinfo');
-    getInfo(playList).then(info => {
-        info.items.forEach(function (item) {
-            console.log(item.id);
-        });        
+// function youtuber() {
+//     var playList = 'PLBAGcD3siRDguyYYzhVwZ3tLvOyyG5k6K';
+//     const { getInfo } = require('ytdl-getinfo');
+//     getInfo(playList).then(info => {
+//         info.items.forEach(function (item) {
+//             console.log(item.id);
+//         });        
+//     });
+// }
+// youtuber()
+
+function youtube_scraper_channel(channel_id) {
+    var url_channel = 'https://www.googleapis.com/youtube/v3/playlists?part=snippet&' + 
+        'channelId=' + channel_id + '&key=' + youtube_google_api_key;
+    request({ url: url_channel }, (error_channel, response_channel, body_channel) => {
+        if (error_channel) { return console.log(error_channel); }
+        var body_channel_json = JSON.parse(body_channel);
+        var arr_playlist = body_channel_json['items'];
+        arr_playlist.forEach(function(playlist) {
+            var playlist_id = playlist['id'];
+            console.log(playlist_id);
+            youtube_scraper_playlist(playlist_id);
+        });
     });
 }
-youtuber()
+
+function youtube_scraper_playlist(playlist_id) {
+    var url_playlist = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&' + 
+        'playlistId=' + playlist_id + '&key=' + youtube_google_api_key;
+    request({ url: url_playlist }, (error_playlist, response_playlist, body_playlist) => {
+        if (error_playlist) { return console.log(error_playlist); }
+        var body_playlist_json = JSON.parse(body_playlist);
+        var arr_videoInfo = body_playlist_json['items'];
+        arr_videoInfo.forEach(function(videoInfo) {
+            var publishedAt = videoInfo['snippet']['publishedAt'];
+            var channelId = videoInfo['snippet']['channelId'];
+            var title = videoInfo['snippet']['title'];
+            var description = videoInfo['snippet']['description'];
+            var channelTitle = videoInfo['snippet']['channelTitle'];
+            var playlistId = videoInfo['snippet']['playlistId'];
+            var videoId = videoInfo['snippet']['resourceId']['videoId'];
+            var videoUrl = 'http://www.youtube.com/watch?v=' + videoId;
+
+            db.addMedia(videoUrl, 1, {
+                channelTitle: channelTitle,
+                channelId: channelId,
+                playlistId: playlistId,
+                title: title,
+                description: description,
+                publishedAt: publishedAt,
+                videoUrl: videoUrl
+            }).then(function (media) {
+                db.addMSTranscriptionTask(media.id)
+                    .then(function (task) {
+                        console.log("Youtube TaskId:" + task.id);
+                    });
+            });
+        });
+    });
+}
+
+function download_youtube_video(media) {
+    var title = media.siteSpecificJSON.title;
+    var videoUrl = media.siteSpecificJSON.videoUrl;
+    var video = youtubedl('http://www.youtube.com/watch?v=90AiXO1pAiA',
+        // Optional arguments passed to youtube-dl.
+        ['--format=18'],
+        // Additional options can be given for calling `child_process.execFile()`.
+        { cwd: __dirname });
+ 
+    // Will be called when the download starts.
+    video.on('info', function(info) {
+        console.log('Download started');
+        console.log('filename: ' + info.filename);
+        console.log('size: ' + info.size);
+    });
+ 
+    video.pipe(fs.createWriteStream(title + '.mp4'));
+}
 
 
 function echo_scraper(email, password) {
@@ -168,6 +242,7 @@ function download_lecture(taskId) {
                         download_echo_lecture(media);
                         break;
                     case 1:
+                        download_youtube_video(media);
                         break;
                     default:
                         console.log("Invalid sourceType");

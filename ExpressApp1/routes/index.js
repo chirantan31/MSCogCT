@@ -30,7 +30,6 @@ function youtuber() {
         });        
     });
 }
-youtuber()
 
 
 function echo_scraper(email, password) {
@@ -101,7 +100,7 @@ function echo_scraper(email, password) {
                 courses.forEach(function (course) {
                     db.addCourseAndSection(course[0], course[1], download_header)
                         .then(function () {
-                            download_course(course, play_session_login, download_header);
+                            download_course_info(course, play_session_login, download_header);
                         });
                 });
             });
@@ -109,8 +108,7 @@ function echo_scraper(email, password) {
     });
 }
 
-
-function download_course(course, play_session_login, download_header) {
+function download_course_info(course, play_session_login, download_header) {
     var url_syllabus = 'https://echo360.org/section';
     var options_syllabus = {
         method: 'GET',
@@ -196,6 +194,8 @@ function download_echo_lecture(media) {
         });
     });
 }
+
+
 
 
 module.exports = router;

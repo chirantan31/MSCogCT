@@ -8,8 +8,8 @@ var path = require('path');
 var fs = require('fs');
 var youtubedl = require('youtube-dl');
 var youtube_google_api_key = 'AIzaSyDKnpdznYOFxm_IRnrclGh4oSdQloZycOo';
-var azureSubscriptionKey = '926e97a14b9946b98175f9b740af6579';
-var azureRegion = 'westus';
+//var azureSubscriptionKey = '926e97a14b9946b98175f9b740af6579';
+//var azureRegion = 'westus';
 const _dirname = '../../Data/';
 
 /* GET home page. */

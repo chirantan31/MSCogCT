@@ -14,7 +14,22 @@ var sequelize;
 //} else {
 //    sequelize = new Sequelize(config.database, config.username, config.password, config);
 //}
-sequelize = new Sequelize('database', 'username', 'password', {
+//sequelize = new Sequelize('MSCogCTDb', 'TestUser', 'Test123!', {
+//    host: '127.0.0.1',
+//    dialect: 'mssql',
+//    port: 1433,
+
+//    pool: {
+//        max: 5,
+//        min: 0,
+//        idle: 10000
+//    },
+
+//    // SQLite only
+//    //storage: 'sqldb.db'
+//});
+
+sequelize = new Sequelize('MSCogCTDb', 'TestUser', 'Test123!', {
     host: 'localhost',
     dialect: 'sqlite',
 
@@ -27,6 +42,7 @@ sequelize = new Sequelize('database', 'username', 'password', {
     // SQLite only
     storage: 'sqldb.db'
 });
+
 
 fs
     .readdirSync(__dirname)

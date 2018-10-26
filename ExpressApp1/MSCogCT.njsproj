@@ -35,7 +35,7 @@
     <Compile Include="db\db.js">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="models\echo_section.js">
+    <Compile Include="models\echo-section.js">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="models\index.js">
@@ -50,12 +50,17 @@
     <Compile Include="models\user.js">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="models\youtube-channel.js">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="routes\index.js" />
     <Compile Include="routes\users.js" />
     <Content Include="libman.json" />
     <Content Include="package.json" />
     <Content Include="public\stylesheets\main.css" />
     <Content Include="README.md" />
+    <Content Include="views\downloadLecture.html" />
+    <Content Include="views\downloadPlaylist.pug" />
     <Content Include="views\index.pug" />
     <Content Include="views\layout.pug" />
     <Content Include="views\error.pug" />

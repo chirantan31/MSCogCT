@@ -4,108 +4,60 @@ var router = express.Router();
 var db = require('../db/db');
 const request = require('request');
 var Cookie = require('request-cookies').Cookie;
-
+var path = require('path');
 var fs = require('fs');
 var youtubedl = require('youtube-dl');
 var youtube_google_api_key = 'AIzaSyDKnpdznYOFxm_IRnrclGh4oSdQloZycOo';
+var azureSubscriptionKey = '926e97a14b9946b98175f9b740af6579';
+var azureRegion = 'westus';
+const _dirname = '../../Data/';
 
 /* GET home page. */
 router.get('/', function (req, res) {
-    var email = 'hongyuw2@illinois.edu';
-    var password = 'JmjlfZYERRIvbYjb';
+    res.render('index', { title: 'Express' });
+});
+
+router.get('/scrapeEcho', function (req, res) {
+
+    // var email = 'hongyuw2@illinois.edu';
+    var email = req.query.email;
+    // var password = 'JmjlfZYERRIvbYjb';
+    var password = req.query.password;
     echo_scraper(email, password);
 
-    var channel_id = 'UCeqlHZDmUEQQHYqnei8doYg';
+    res.render('index', { title: 'Express' });
+});
+
+router.get('/scrapeYoutube', function (req, res) {
+    var channel_id = req.query.channelId;
+    // var channel_id = 'UCeqlHZDmUEQQHYqnei8doYg';
     youtube_scraper_channel(channel_id);
-
     res.render('index', { title: 'Express' });
 });
 
-router.get('/downloadLecture', function (req, res) {
-    download_lecture(req.query.taskId);
-    res.render('index', { title: 'Express' });
-});
-
-// function youtuber() {
-//     var playList = 'PLBAGcD3siRDguyYYzhVwZ3tLvOyyG5k6K';
-//     const { getInfo } = require('ytdl-getinfo');
-//     getInfo(playList).then(info => {
-//         info.items.forEach(function (item) {
-//             console.log(item.id);
-//         });        
-//     });
-// }
-// youtuber()
+const promiseSerial = funcs =>
+    funcs.reduce((promise, func) =>
+        promise.then(result => func().then(Array.prototype.concat.bind(result))),
+        Promise.resolve([]))
 
 function youtube_scraper_channel(channel_id) {
-    var url_channel = 'https://www.googleapis.com/youtube/v3/playlists?part=snippet&' + 
+    var url_channel = 'https://www.googleapis.com/youtube/v3/playlists?part=snippet&' +
         'channelId=' + channel_id + '&key=' + youtube_google_api_key;
     request({ url: url_channel }, (error_channel, response_channel, body_channel) => {
         if (error_channel) { return console.log(error_channel); }
         var body_channel_json = JSON.parse(body_channel);
         var arr_playlist = body_channel_json['items'];
-        arr_playlist.forEach(function(playlist) {
-            var playlist_id = playlist['id'];
-            console.log(playlist_id);
-            youtube_scraper_playlist(playlist_id);
-        });
+        var funcs = arr_playlist.map(playlist => () => addYoutubeChannelPlaylist(playlist['id'], channel_id));
+        // execute Promises in serial
+        promiseSerial(funcs)
+            .then()
+            .catch(console.error.bind(console));
     });
 }
 
-function youtube_scraper_playlist(playlist_id) {
-    var url_playlist = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&' + 
-        'playlistId=' + playlist_id + '&key=' + youtube_google_api_key;
-    request({ url: url_playlist }, (error_playlist, response_playlist, body_playlist) => {
-        if (error_playlist) { return console.log(error_playlist); }
-        var body_playlist_json = JSON.parse(body_playlist);
-        var arr_videoInfo = body_playlist_json['items'];
-        arr_videoInfo.forEach(function(videoInfo) {
-            var publishedAt = videoInfo['snippet']['publishedAt'];
-            var channelId = videoInfo['snippet']['channelId'];
-            var title = videoInfo['snippet']['title'];
-            var description = videoInfo['snippet']['description'];
-            var channelTitle = videoInfo['snippet']['channelTitle'];
-            var playlistId = videoInfo['snippet']['playlistId'];
-            var videoId = videoInfo['snippet']['resourceId']['videoId'];
-            var videoUrl = 'http://www.youtube.com/watch?v=' + videoId;
-
-            db.addMedia(videoUrl, 1, {
-                channelTitle: channelTitle,
-                channelId: channelId,
-                playlistId: playlistId,
-                title: title,
-                description: description,
-                publishedAt: publishedAt,
-                videoUrl: videoUrl
-            }).then(function (media) {
-                db.addMSTranscriptionTask(media.id)
-                    .then(function (task) {
-                        console.log("Youtube TaskId:" + task.id);
-                    });
-            });
-        });
-    });
+function addYoutubeChannelPlaylist(playlist_id, channel_id) {
+    return db.addYoutubeChannelPlaylist(playlist_id, channel_id).then(youtube_scraper_playlist(playlist_id));
 }
-
-function download_youtube_video(media) {
-    var title = media.siteSpecificJSON.title;
-    var videoUrl = media.siteSpecificJSON.videoUrl;
-    var video = youtubedl('http://www.youtube.com/watch?v=90AiXO1pAiA',
-        // Optional arguments passed to youtube-dl.
-        ['--format=18'],
-        // Additional options can be given for calling `child_process.execFile()`.
-        { cwd: __dirname });
- 
-    // Will be called when the download starts.
-    video.on('info', function(info) {
-        console.log('Download started');
-        console.log('filename: ' + info.filename);
-        console.log('size: ' + info.size);
-    });
- 
-    video.pipe(fs.createWriteStream(title + '.mp4'));
-}
-
 
 function echo_scraper(email, password) {
     var url_directLogin = 'https://echo360.org/directLogin';
@@ -232,46 +184,190 @@ function download_course_info(course, play_session_login, download_header) {
     });
 }
 
-function download_lecture(taskId) {
-    db.getTask(taskId).then(task => {
-        db.getMedia(task.mediaId)
-            .then(media => {
-                switch (media.sourceType) {
-                    case 0:
-                        download_echo_lecture(media);
-                        break;
-                    case 1:
-                        download_youtube_video(media);
-                        break;
-                    default:
-                        console.log("Invalid sourceType");
-                }
-                console.log(media.videoURL);
-            });
-    });
-}
-
-function download_echo_lecture(media) {
-    var sectionId = media.siteSpecificJSON.sectionId;
-    console.log("sectionId: " + sectionId);
-    db.getEchoSection(sectionId).then(section => {
-        var wget = require('node-wget');
-        var url = media.videoURL;
-        var dest = media.id + "_" + url.substring(url.lastIndexOf('/') + 1);
-        wget({
-            url: url,
-            dest: dest,
-            headers:
-            {
-                Cookie: section.json.downloadHeader
-            },
-        }, function (error_download, response_download, body_download) {
-            if (error_download) throw new Error(error_download);
+function download_lecture(taskId, callback) {
+    console.log("Download_lecture");
+    return db.getTask(taskId)
+        .then(task => {
+            return db.getMedia(task.mediaId)
+                .then(media => {
+                    switch (media.sourceType) {
+                        case 0:
+                            return download_echo_lecture(task, media, callback);
+                            break;
+                        case 1:
+                            return download_youtube_video(task, media, callback);
+                            break;
+                        default:
+                            console.log("Invalid sourceType");
+                    }
+                });
         });
+}
+
+function download_echo_lecture(task, media) {
+    console.log("download_echo_lecture");
+    var sectionId = media.siteSpecificJSON.sectionId;
+    return db.getEchoSection(sectionId)
+        .then(section => {
+            var wget = require('node-wget-promise');
+            var url = media.videoURL;
+            var dest = _dirname + media.id + "_" + url.substring(url.lastIndexOf('/') + 1);
+            return wget(url, {
+                output: dest,
+                headers:
+                {
+                    Cookie: section.json.downloadHeader
+                },
+            })
+                .then(result => task.update({
+                    videoLocalLocation: path.resolve(dest)
+                }));
+        });
+}
+
+function download_youtube_video(task, media) {
+    console.log("download_youtube_video");
+    var videoUrl = JSON.parse(media.siteSpecificJSON).videoUrl;
+    var outputFile = _dirname + media.id + '.mp4';
+    const { spawn } = require('child-process-promise');
+    const youtubedl = spawn('youtube-dl', [videoUrl, '--format=18', '--output', outputFile]);
+
+    youtubedl.childProcess.stdout.on('data', (data) => {
+        console.log(`stdout: ${data}`);
     });
+
+    youtubedl.childProcess.stderr.on('data', (data) => {
+        console.log(`stderr: ${data}`);
+    });
+
+    return youtubedl.then(result => task.update({
+        videoLocalLocation: path.resolve(outputFile)
+    }));
+}
+
+function youtube_scraper_playlist(playlist_id) {
+    var url_playlist = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&' +
+        'playlistId=' + playlist_id + '&key=' + youtube_google_api_key + '&maxResults=' + 50;
+    request({ url: url_playlist }, (error_playlist, response_playlist, body_playlist) => {
+        if (error_playlist) { return console.log(error_playlist); }
+        var body_playlist_json = JSON.parse(body_playlist);
+        var arr_videoInfo = body_playlist_json['items'];
+        var funcs = arr_videoInfo.map(videoInfo => () => addVideoInfo(videoInfo));
+        promiseSerial(funcs)
+            .then()
+            .catch(console.error.bind(console));
+    });
+}
+
+function addVideoInfo(videoInfo) {
+    var publishedAt = videoInfo['snippet']['publishedAt'];
+    var channelId = videoInfo['snippet']['channelId'];
+    var title = videoInfo['snippet']['title'];
+    var description = videoInfo['snippet']['description'];
+    var channelTitle = videoInfo['snippet']['channelTitle'];
+    var playlistId = videoInfo['snippet']['playlistId'];
+    var videoId = videoInfo['snippet']['resourceId']['videoId'];
+    var videoUrl = 'http://www.youtube.com/watch?v=' + videoId;
+    var i = 2;
+    return db.addMedia(videoUrl, 1, {
+        channelTitle: channelTitle,
+        channelId: channelId,
+        playlistId: playlistId,
+        title: title,
+        description: description,
+        publishedAt: publishedAt,
+        videoUrl: videoUrl
+    })
+        .then(media => db.addMSTranscriptionTask(media[0].id))
+        .then(task => {
+            i--;
+            if (i == 0) return null;
+            return download_lecture(task[0].id)
+                .then(result => convertVideoToWav(task[0].id))
+                .then(result => wavToSrt(task[0].id))
+                .then(result => { console.log("Done!") });
+            console.log("Youtube TaskId:" + task[0].id);
+        });
+}
+
+function convertVideoToWav(taskId, callback) {
+    console.log("convertVideoToWav");
+    return db.getTask(taskId)
+        .then(task => {
+            var pathToFile = task.videoLocalLocation;
+            var outputFile = _dirname + pathToFile.substring(pathToFile.lastIndexOf('/') + 1, pathToFile.lastIndexOf('.')) + '.wav';
+            const { spawn } = require('child-process-promise');
+            const ffmpeg = spawn('ffmpeg', ['-nostdin', '-i', pathToFile, '-c:a', 'pcm_s16le', '-ac', '1','-y', '-ar', '16000', outputFile]);
+
+            ffmpeg.childProcess.stdout.on('data', (data) => {
+                console.log(`stdout: ${data}`);
+            });
+
+            ffmpeg.childProcess.stderr.on('data', (data) => {
+                console.log(`stderr: ${data}`);
+            });
+
+            return ffmpeg.then(result => task.update({
+                wavAudioLocalFile: path.resolve(outputFile)
+            }));
+        });
 }
 
 
 
+function wavToSrt(taskId, callback) {
+    console.log("wavToSrt");
+    return db.getTask(taskId).then(task => {
+        var pathToFile = task.wavAudioLocalFile;
+        var outputFile = _dirname + pathToFile.substring(pathToFile.lastIndexOf('/') + 1, pathToFile.lastIndexOf('.')) + '.srt';
+        const { spawn } = require('child-process-promise');
+        const dotnet = spawn('dotnet', ['MSCognitiveDotNetCore/MSCog.dll', azureSubscriptionKey, azureRegion, pathToFile]);
+        dotnet.childProcess.stdout.on('data', (data) => {
+            console.log(`stdout: ${data}`);
+        });
+
+        dotnet.childProcess.stderr.on('data', (data) => {
+            console.log(`stderr: ${data}`);
+        });
+
+        return dotnet.then(result => task.update({
+            srtFileLocation: path.resolve(outputFile)
+        }));
+    });
+}
+
+router.get('/dLecture', function (req, res) {
+    res.render('downloadPlaylist');
+})
+
+router.get('/scrapeYoutubePlaylist', function (req, res) {
+    var playlistId = req.query.playlistId;
+    // var channel_id = 'UCeqlHZDmUEQQHYqnei8doYg';
+    youtube_scraper_playlist(playlistId);
+    res.render('index', { title: 'Express' });
+})
+
+router.get('/downloadLecture', function (req, res) {
+    var taskId = req.query.taskId
+    download_lecture(taskId)
+        .then(result => convertVideoToWav(taskId))
+        .then(result => wavToSrt(taskId))
+        .then(result => { console.log("Done!") });
+    res.render('index', { title: 'Express' });
+});
+
+router.get('/wavToSrt', function (req, res) {
+    wavToSrt(req.query.taskId).then(function () {
+        console.log("Converted to Srt");
+    });
+    res.render('index', { title: 'Express' });
+});
+
+router.get('/convertToWav', function (req, res) {
+    convertVideoToWav(req.query.taskId).then(function () {
+        console.log("Done Conversion");
+    });
+    res.render('index', { title: 'Express' });
+});
 
 module.exports = router;

@@ -1,0 +1,10 @@
+﻿extends layout
+
+block content
+  h1= title
+  form(action = "/scrapeYoutubePlaylist")
+         div
+            label(for = "say") Enter Youtube PlaylistId:
+            input(name = "playlistId")
+         br
+         button(type = "submit") Fetch!
